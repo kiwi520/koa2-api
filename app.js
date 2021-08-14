@@ -10,7 +10,8 @@ const port = 9000;
 
 // 获取静态资源文件夹
 app.use(static(path.join(__dirname+'/assets')));
-app.use(static(path.join(__dirname+'/static')));
+// app.use(static(path.join(__dirname+'/static')));
+app.use(require('koa-static')(__dirname + '/static'))
 
 // //  匹配不到页面的全部跳转去404
 // app.use(async (ctx, next) => {

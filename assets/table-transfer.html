@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>transferTable</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="./layui/css/layui.css">
+    <script src="./layui/layui.js"></script>
+</head>
+<body style="padding: 20px">
+<div class="layui-form">
+    <div class="layui-input-inline">
+        <input type="text" id="name" placeholder="用户名模糊搜索" class="layui-input">
+    </div>
+    <div class="layui-btn-group">
+        <button id="reload" class="layui-btn">搜索</button>
+
+        <button id="dataShow" class="layui-btn">显示已选中</button>
+        <button id="submit" class="layui-btn">保存</button>
+    </div>
+</div>
+
+<div id="table" lay-filter="table"></div>
+
+<div id="checkedDiv" style="display: none">
+    <div class="layui-panel" style="overflow: hidden">
+        <div id="checkedTable" lay-filter="checkedTable"></div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    layui.extend({
+        // transferTable: '{/}layui/transferTable'
+    }).use(['table', 'layer'], function () {
+        let table = layui.table,
+                layer = layui.layer,
+                $ = layui.$;
+
+        var list = {}
+        let cols = [
+            {checkbox: true, fixed: true},
+            {field: 'id', title: 'ID'},
+            {field: 'depName', title: '所在部门'},
+            {field: 'name', title: '姓名'}
+        ]
+
+        table.render({
+            elem: '#table',
+            url: 'employee/list',
+            cols: [cols],
+            page: [true],
+            height: [500],
+            where: {name: '', id: 0},
+            id_name: 'id',
+            parseData: function (res) { //res 即为原始返回的数据
+                return {
+                    "code": 0, //解析接口状态
+                    "msg": '', //解析提示文本
+                    "count": res.count, //解析数据长度
+                    "data": res.data //解析数据列表
+                };
+            },
+            jump: function (obj, first) {
+                console.log('分页')
+            },
+            done: function (res, curr, count) {
+                let allChecked = []
+                let table_data = table.cache.table
+                table_data.forEach(function (item, index) {
+                    if (list.hasOwnProperty(item.id)) {
+                        allChecked.push(true)
+                        let index = item['LAY_TABLE_INDEX'];
+                        $('tr[data-index=' + index + '] input[type="checkbox"]').prop('checked', true);
+                        $('tr[data-index=' + index + '] input[type="checkbox"]').next().addClass('layui-form-checked');
+                    }else {
+                        allChecked.push(false)
+                    }
+                })
+                if (allChecked.indexOf(false) === -1){
+                    $('th[data-unresize="true"] input[type="checkbox"]').prop('checked', true)
+                    $('th[data-unresize="true"] input[type="checkbox"]').next().addClass('layui-form-checked');
+                }
+            }
+        })
+
+        table.on('checkbox(table)', function (obj) {
+            let data = obj.data;
+            let checked = obj.checked
+            if (obj.type === 'one') {
+                console.log('one')
+                if (checked) {
+                    if (!list.hasOwnProperty(data.id)) {
+                        list[data.id] = data
+                    }
+                } else {
+                    if (list.hasOwnProperty(data.id)) {
+                        delete list[data.id]
+                    }
+                }
+
+            } else if (obj.type === 'all') {
+                let current_data = table.cache.table
+
+                if (checked) {
+                    current_data.forEach(function (item) {
+                        if (!list.hasOwnProperty(item.id)) {
+                            list[item.id] = item
+                        }
+                    })
+                } else {
+                    current_data.forEach(function (item) {
+                        if (list.hasOwnProperty(item.id)) {
+                            delete list[item.id]
+                        }
+                    })
+                }
+            }
+
+        });
+
+        //监听工具条
+        table.on('tool(checkedTable)', function(obj){
+            var data = obj.data;
+            if(obj.event === 'del'){
+                layer.confirm('真的删除行么', function(index){
+                    obj.del();
+                    if (list.hasOwnProperty(data.id)) {
+                        delete list[data.id]
+                    }
+
+                    layer.close(index);
+                });
+            }
+        });
+
+        $('#reload').on('click', function () {
+            let name = $('#name').val()
+            table.reload('table',{
+                where: {name, id: 0},
+                page:{
+                    curr: 1
+                }
+            })
+        })
+
+        $('#submit').on('click', function () {
+            var id = transferTable.get('transferTable_2_2');
+            layer.msg(JSON.stringify(id));
+        })
+
+        //渲染选中的数据
+        $('#dataShow').on('click', function () {
+            table.render({
+                elem: '#checkedTable',
+                cols: [[
+                    {field: 'id', title: 'ID', align: 'center', width: 100},
+                    {field: 'depName', title: '所在部门', align: 'center', width: 200},
+                    {field: 'name', title: '姓名', align: 'center', width: 100},
+                    {title: '操作', width:95, align:'center', toolbar: '#barCheckedTable'}
+                ]],
+                page: [true],
+                width: '500px',
+                maxHeight: '500px',
+                parseData: function (res) { //res 即为原始返回的数据
+                    return {
+                        "code": 0, //解析接口状态
+                        "msg": '', //解析提示文本
+                        "count": res.count, //解析数据长度
+                        "data": res.data //解析数据列表
+                    };
+                },
+                data: Object.keys(list).map(function (i) {
+                    return list[i]
+                }),
+                done: function (res, curr, count) {
+                },
+            })
+
+            //模态框
+            layer.open({
+                type: 1,
+                area: '500px',
+                offset: '100px',
+                content: $('#checkedDiv'),
+                cancel: function (index, layero) {
+                    table.reload('table',{
+                        where: {name: '', id: 0},
+                        page:{
+                            curr: 1
+                        }
+                    })
+                }
+            });
+        })
+
+    })
+</script>
+
+<script type="text/html" id="barCheckedTable">
+    <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+</script>
+</body>
+</html>
